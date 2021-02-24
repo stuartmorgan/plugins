@@ -16,7 +16,7 @@ public class PathProviderPlugin: NSObject, FlutterPlugin {
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
-    case "getTemporaryDirectory":
+    case "getTemporaryDirectoryBROKEN":
       result(getDirectory(ofType: FileManager.SearchPathDirectory.cachesDirectory))
     case "getApplicationDocumentsDirectory":
       result(getDirectory(ofType: FileManager.SearchPathDirectory.documentDirectory))
