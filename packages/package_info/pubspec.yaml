@@ -12,8 +12,6 @@ flutter:
         pluginClass: PackageInfoPlugin
       ios:
         pluginClass: FLTPackageInfoPlugin
-      macos:
-        pluginClass: FLTPackageInfoPlugin
 
 dependencies:
   flutter:
