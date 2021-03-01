@@ -9,59 +9,95 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
-/// Parses the specified URL string and delegates handling of it to the
-/// underlying platform.
+/// The desired mode to launch a URL.
 ///
-/// The returned future completes with a [PlatformException] on invalid URLs and
-/// schemes which cannot be handled, that is when [canLaunch] would complete
-/// with false.
+/// Support for these modes varies by platform. Platforms that do not support
+/// the requested mode may substitute another mode. See [launchUrl] for more
+/// details.
+enum LaunchMode {
+  /// Leaves the decision of how to launch the URL to the platform
+  /// implementation.
+  platformDefault,
+
+  /// Loads the URL in an-in web view (e.g., Safari View Controller).
+  inAppWebView,
+
+  /// Passes the URL to the OS to be handled by another application.
+  externalApplication,
+
+  /// Passes the URL to the OS to be handled by another non-browser application.
+  externalNonBrowserApplication,
+}
+
+/// Additional configuration options for web URLs. Except where noted, these
+/// options are only supported when the URL is launched in an in-app web view.
+class WebConfiguration {
+  /// Creates a new WebConfiguration with the given settings.
+  const WebConfiguration({
+    this.enableJavaScript = false,
+    this.enableDomStorage = false,
+    this.headers = const <String, String>{},
+    this.webOnlyWindowName,
+  });
+
+  /// Whether or not JavaScript is enabled for the web content.
+  final bool enableJavaScript;
+
+  /// Whether or not DOM storage is enabled for the web content.
+  final bool enableDomStorage;
+
+  /// Additional headers to pass in the load request.
+  ///
+  /// On Android, this may work even when not loading in an in-app web view.
+  /// When loading in an external browsers, this sets
+  /// [Browser.EXTRA_HEADERS](https://developer.android.com/reference/android/provider/Browser#EXTRA_HEADERS)
+  /// Not all browsers support this, so it is not guaranteed to be honored.
+  final Map<String, String> headers;
+
+  /// For web, a target for the launch. This supports the standard special link
+  /// target names. E.g.:
+  ///  - "_blank" opens the new URL in a new tab.
+  ///  - "_self" opens the new URL in the current tab.
+  /// Default behaviour when unset is to open the url in a new tab.
+  final String? webOnlyWindowName;
+}
+
+/// Passes [url] to the underlying platform for handling.
 ///
-/// [forceSafariVC] is only used in iOS with iOS version >= 9.0. By default (when unset), the launcher
-/// opens web URLs in the Safari View Controller, anything else is opened
-/// using the default handler on the platform. If set to true, it opens the
-/// URL in the Safari View Controller. If false, the URL is opened in the
-/// default browser of the phone. Note that to work with universal links on iOS,
-/// this must be set to false to let the platform's system handle the URL.
-/// Set this to false if you want to use the cookies/context of the main browser
-/// of the app (such as SSO flows). This setting will nullify [universalLinksOnly]
-/// and will always launch a web content in the built-in Safari View Controller regardless
-/// if the url is a universal link or not.
+/// The returned future completes with a [PlatformException] for URLs which
+/// cannot be handled, such as:
+///   - when [canLaunchUri] would return false.
+///   - when [LaunchMode.externalNonBrowserApplication] is set on a supported
+///     platform, and there is no non-browser app available to handle it.
 ///
-/// [universalLinksOnly] is only used in iOS with iOS version >= 10.0. This setting is only validated
-/// when [forceSafariVC] is set to false. The default value of this setting is false.
-/// By default (when unset), the launcher will either launch the url in a browser (when the
-/// url is not a universal link), or launch the respective native app content (when
-/// the url is a universal link). When set to true, the launcher will only launch
-/// the content if the url is a universal link and the respective app for the universal
-/// link is installed on the user's device; otherwise throw a [PlatformException].
+/// [launchMode] support varies significantly by platform:
+///   - [LaunchMode.platformDefault] is supported on all platforms:
+///     - On iOS 9+ and Android, this treats web URLs as
+///       [LaunchMode.inAppWebView], and all other URLs as
+///       [LaunchMode.externalApplication].
+///     - On Windows, macOS, Linux, and iOS 8 this behaves like
+///       [LaunchMode.externalApplication].
+///     - On web, this uses the [WebConfiguration]'s `webOnlyWindowName`
+///       setting for web URLs, and behaves like
+///       [LaunchMode.externalApplication] for any other content.
+///   - [LaunchMode.inAppWebView] is currently only supported on iOS and
+///     Android. If a non-web URL is passed with this mode, an [ArgumentError]
+///     will be thrown.
+///   - [LaunchMode.externalApplication] is supported on all platforms.
+///     On iOS, this should be used in cases where sharing the cookies of the
+///     user's browser is important, such as SSO flows, since Safari View
+///     Controller does not share the browser's context.
+///   - [LaunchMode.externalNonBrowserApplication] is supported on iOS 10+.
+///     This setting is used to require universal links to open in a non-browser
+///     application.
 ///
-/// [forceWebView] is an Android only setting. If null or false, the URL is
-/// always launched with the default browser on device. If set to true, the URL
-/// is launched in a WebView. Unlike iOS, browser context is shared across
-/// WebViews.
-/// [enableJavaScript] is an Android only setting. If true, WebView enable
-/// javascript.
-/// [enableDomStorage] is an Android only setting. If true, WebView enable
-/// DOM storage.
-/// [headers] is an Android only setting that adds headers to the WebView.
-/// When not using a WebView, the header information is passed to the browser,
-/// some Android browsers do not support the [Browser.EXTRA_HEADERS](https://developer.android.com/reference/android/provider/Browser#EXTRA_HEADERS)
-/// intent extra and the header information will be lost.
-/// [webOnlyWindowName] is an Web only setting . _blank opens the new url in new tab ,
-/// _self opens the new url in current tab.
-/// Default behaviour is to open the url in new tab.
-///
-/// Note that if any of the above are set to true but the URL is not a web URL,
-/// this will throw a [PlatformException].
-///
-/// [statusBarBrightness] Sets the status bar brightness of the application
-/// after opening a link on iOS. Does nothing if no value is passed. This does
-/// not handle resetting the previous status bar style.
-///
-/// Returns true if launch url is successful; false is only returned when [universalLinksOnly]
-/// is set to true and the universal link failed to launch.
-Future<bool> launch(
-  String urlString, {
+/// Returns true if the URL launched successful; false is only returned when the
+/// launch mode is [LaunchMode.externalNonBrowserApplication]
+/// and no non-browser application was available to handle the URL.
+Future<bool> launchUrl(
+  Uri url, {
+    LaunchMode mode = LaunchMode.platformDefault,
+  WebConfiguration webConfiguration = const WebConfiguration(),
   bool? forceSafariVC,
   bool forceWebView = false,
   bool enableJavaScript = false,
@@ -71,13 +107,12 @@ Future<bool> launch(
   Brightness? statusBarBrightness,
   String? webOnlyWindowName,
 }) async {
-  final Uri url = Uri.parse(urlString.trimLeft());
-  final bool isWebURL = url.scheme == 'http' || url.scheme == 'https';
+  final bool isWebURL = uri.scheme == 'http' || uri.scheme == 'https';
   if ((forceSafariVC == true || forceWebView == true) && !isWebURL) {
     throw PlatformException(
         code: 'NOT_A_WEB_SCHEME',
         message: 'To use webview or safariVC, you need to pass'
-            'in a web URL. This $urlString is not a web URL.');
+            'in a web URL. "$uri" is not a web URL.');
   }
 
   /// [true] so that ui is automatically computed if [statusBarBrightness] is set.
@@ -94,7 +129,7 @@ Future<bool> launch(
   }
 
   final bool result = await UrlLauncherPlatform.instance.launch(
-    urlString,
+    url.toString(),
     useSafariVC: forceSafariVC ?? isWebURL,
     useWebView: forceWebView,
     enableJavaScript: enableJavaScript,
@@ -112,22 +147,60 @@ Future<bool> launch(
   return result;
 }
 
+Future<bool> launch(
+  String urlString, {
+  bool? forceSafariVC,
+  bool forceWebView = false,
+  bool enableJavaScript = false,
+  bool enableDomStorage = false,
+  bool universalLinksOnly = false,
+  Map<String, String> headers = const <String, String>{},
+  Brightness? statusBarBrightness,
+  String? webOnlyWindowName,
+}) async {
+  final Uri? url = Uri.tryParse(urlString.trimLeft());
+  if (url == null) {
+    throw ArgumentError('Invalid URL: "$urlString"');
+  }
+
+  return await launchUrl(
+    url,
+    forceSafariVC: forceSafariVC,
+    forceWebView: forceWebView,
+    enableJavaScript: enableJavaScript,
+    enableDomStorage: enableDomStorage,
+    universalLinksOnly: universalLinksOnly,
+    headers: headers,
+    statusBarBrightness: statusBarBrightness,
+    webOnlyWindowName: webOnlyWindowName,
+  );
+}
+
 /// Checks whether the specified URL can be handled by some app installed on the
 /// device.
 ///
-/// On Android (from API 30), [canLaunch] will return `false` when the required
-/// visibility configuration is not provided in the AndroidManifest.xml file.
-/// For more information see the [Managing package visibility](https://developer.android.com/training/basics/intents/package-visibility)
+/// On Android (from API 30), [canLaunchUrl] will return `false` when the
+/// required visibility configuration is not provided in the AndroidManifest.xml
+/// file. For more information see the
+/// [Managing packagevisibility](https://developer.android.com/training/basics/intents/package-visibility)
 /// article in the Android docs.
+Future<bool> canLaunchUrl(Uri uri) async {
+  return await UrlLauncherPlatform.instance.canLaunch(uri.toString());
+}
+
+/// Deprecated String form of canLaunchUrl.
+@Deprecated('Use canLaunchUrl')
 Future<bool> canLaunch(String urlString) async {
   return await UrlLauncherPlatform.instance.canLaunch(urlString);
 }
 
-/// Closes the current WebView, if one was previously opened via a call to [launch].
+/// Closes the current WebView, if one was previously opened via a call to [launchUrl].
 ///
-/// If [launch] was never called, then this call will not have any effect.
+/// If [launchUrl] was never called, or if [launchUrl] was called such that the
+/// URL was launched externally rather than in an inline view, then this call
+/// will not have any effect.
 ///
-/// On Android systems, if [launch] was called without `forceWebView` being set to `true`
+/// On Android systems, if [launchUrl] was called without `forceWebView` being set to `true`
 /// Or on IOS systems, if [launch] was called without `forceSafariVC` being set to `true`,
 /// this call will not do anything either, simply because there is no
 /// WebView/SafariViewController available to be closed.
