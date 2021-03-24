@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -63,6 +63,14 @@
     [self.queue restoreCompletedTransactionsWithApplicationUsername:applicationName];
   } else {
     [self.queue restoreCompletedTransactions];
+  }
+}
+
+- (void)presentCodeRedemptionSheet {
+  if (@available(iOS 14, *)) {
+    [self.queue presentCodeRedemptionSheet];
+  } else {
+    NSLog(@"presentCodeRedemptionSheet is only available on iOS 14 or newer");
   }
 }
 

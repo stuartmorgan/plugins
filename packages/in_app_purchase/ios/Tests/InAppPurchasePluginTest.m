@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -248,6 +248,22 @@
                          }];
   [self waitForExpectations:@[ expectation ] timeout:5];
   XCTAssertTrue(result);
+}
+
+- (void)testPresentCodeRedemptionSheet {
+  XCTestExpectation* expectation =
+      [self expectationWithDescription:@"expect successfully present Code Redemption Sheet"];
+  FlutterMethodCall* call = [FlutterMethodCall
+      methodCallWithMethodName:@"-[InAppPurchasePlugin presentCodeRedemptionSheet:result:]"
+                     arguments:nil];
+  __block BOOL callbackInvoked = NO;
+  [self.plugin handleMethodCall:call
+                         result:^(id r) {
+                           callbackInvoked = YES;
+                           [expectation fulfill];
+                         }];
+  [self waitForExpectations:@[ expectation ] timeout:5];
+  XCTAssertTrue(callbackInvoked);
 }
 
 - (void)testGetPendingTransactions {

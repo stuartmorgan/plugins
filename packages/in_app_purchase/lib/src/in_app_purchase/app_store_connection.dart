@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -84,8 +84,8 @@ class AppStoreConnection implements InAppPurchaseConnection {
   }
 
   @override
-  Future<BillingResultWrapper> completePurchase(PurchaseDetails purchase,
-      {String? developerPayload}) async {
+  Future<BillingResultWrapper> completePurchase(
+      PurchaseDetails purchase) async {
     if (purchase.skPaymentTransaction == null) {
       throw ArgumentError(
           'completePurchase unsuccessful. The `purchase.skPaymentTransaction` is not valid');
@@ -96,8 +96,7 @@ class AppStoreConnection implements InAppPurchaseConnection {
   }
 
   @override
-  Future<BillingResultWrapper> consumePurchase(PurchaseDetails purchase,
-      {String? developerPayload}) {
+  Future<BillingResultWrapper> consumePurchase(PurchaseDetails purchase) {
     throw UnsupportedError('consume purchase is not available on Android');
   }
 
@@ -201,6 +200,11 @@ class AppStoreConnection implements InAppPurchaseConnection {
               details: exception.details),
     );
     return productDetailsResponse;
+  }
+
+  @override
+  Future presentCodeRedemptionSheet() {
+    return _skPaymentQueueWrapper.presentCodeRedemptionSheet();
   }
 }
 

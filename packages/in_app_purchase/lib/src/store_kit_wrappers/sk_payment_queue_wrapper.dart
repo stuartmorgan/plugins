@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -135,6 +135,17 @@ class SKPaymentQueueWrapper {
     await channel.invokeMethod<void>(
         '-[InAppPurchasePlugin restoreTransactions:result:]',
         applicationUserName);
+  }
+
+  /// Present Code Redemption Sheet
+  ///
+  /// Use this to allow Users to enter and redeem Codes
+  ///
+  /// This method triggers [`-[SKPayment
+  /// presentCodeRedemptionSheet]`](https://developer.apple.com/documentation/storekit/skpaymentqueue/3566726-presentcoderedemptionsheet?language=objc)
+  Future<void> presentCodeRedemptionSheet() async {
+    await channel.invokeMethod<void>(
+        '-[InAppPurchasePlugin presentCodeRedemptionSheet:result:]');
   }
 
   // Triage a method channel call from the platform and triggers the correct observer method.

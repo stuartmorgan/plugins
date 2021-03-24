@@ -1,4 +1,4 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
+// Copyright 2013 The Flutter Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -29,6 +29,7 @@ typedef void (^UpdatedDownloads)(NSArray<SKDownload *> *downloads);
 // Can throw exceptions if the transaction type is purchasing, should always used in a @try block.
 - (void)finishTransaction:(nonnull SKPaymentTransaction *)transaction;
 - (void)restoreTransactions:(nullable NSString *)applicationName;
+- (void)presentCodeRedemptionSheet;
 - (NSArray<SKPaymentTransaction *> *)getUnfinishedTransactions;
 
 // This method needs to be called before any other methods.
