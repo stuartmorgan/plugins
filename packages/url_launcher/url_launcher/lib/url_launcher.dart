@@ -35,16 +35,20 @@ enum LaunchMode {
 class WebConfiguration {
   /// Creates a new WebConfiguration with the given settings.
   const WebConfiguration({
-    this.enableJavaScript = false,
-    this.enableDomStorage = false,
+    this.enableJavaScript = true,
+    this.enableDomStorage = true,
     this.headers = const <String, String>{},
     this.webOnlyWindowName,
   });
 
   /// Whether or not JavaScript is enabled for the web content.
+  ///
+  /// Disabling this may not be supported on all platforms.
   final bool enableJavaScript;
 
   /// Whether or not DOM storage is enabled for the web content.
+  ///
+  /// Disabling this may not be supported on all platforms.
   final bool enableDomStorage;
 
   /// Additional headers to pass in the load request.
