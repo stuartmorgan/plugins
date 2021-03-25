@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -70,7 +71,7 @@ class WebConfiguration {
 ///   - when [LaunchMode.externalNonBrowserApplication] is set on a supported
 ///     platform, and there is no non-browser app available to handle it.
 ///
-/// [launchMode] support varies significantly by platform:
+/// [mode] support varies significantly by platform:
 ///   - [LaunchMode.platformDefault] is supported on all platforms:
 ///     - On iOS 9+ and Android, this treats web URLs as
 ///       [LaunchMode.inAppWebView], and all other URLs as
@@ -96,57 +97,35 @@ class WebConfiguration {
 /// and no non-browser application was available to handle the URL.
 Future<bool> launchUrl(
   Uri url, {
-    LaunchMode mode = LaunchMode.platformDefault,
+  LaunchMode mode = LaunchMode.platformDefault,
   WebConfiguration webConfiguration = const WebConfiguration(),
-  bool? forceSafariVC,
-  bool forceWebView = false,
-  bool enableJavaScript = false,
-  bool enableDomStorage = false,
-  bool universalLinksOnly = false,
   Map<String, String> headers = const <String, String>{},
-  Brightness? statusBarBrightness,
   String? webOnlyWindowName,
 }) async {
-  final bool isWebURL = uri.scheme == 'http' || uri.scheme == 'https';
-  if ((forceSafariVC == true || forceWebView == true) && !isWebURL) {
+  final bool isWebURL = url.scheme == 'http' || url.scheme == 'https';
+  if (mode == LaunchMode.inAppWebView && !isWebURL) {
     throw PlatformException(
         code: 'NOT_A_WEB_SCHEME',
-        message: 'To use webview or safariVC, you need to pass'
-            'in a web URL. "$uri" is not a web URL.');
+        message: 'To use an in-app web view, you must provide a web URL. '
+            '"$url" is not a web URL.');
   }
+  final bool useWebView = mode == LaunchMode.inAppWebView ||
+      (isWebURL && mode == LaunchMode.platformDefault);
 
-  /// [true] so that ui is automatically computed if [statusBarBrightness] is set.
-  bool previousAutomaticSystemUiAdjustment = true;
-  if (statusBarBrightness != null &&
-      defaultTargetPlatform == TargetPlatform.iOS &&
-      WidgetsBinding.instance != null) {
-    previousAutomaticSystemUiAdjustment =
-        WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment;
-    WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment = false;
-    SystemChrome.setSystemUIOverlayStyle(statusBarBrightness == Brightness.light
-        ? SystemUiOverlayStyle.dark
-        : SystemUiOverlayStyle.light);
-  }
-
-  final bool result = await UrlLauncherPlatform.instance.launch(
+  return await UrlLauncherPlatform.instance.launch(
     url.toString(),
-    useSafariVC: forceSafariVC ?? isWebURL,
-    useWebView: forceWebView,
-    enableJavaScript: enableJavaScript,
-    enableDomStorage: enableDomStorage,
-    universalLinksOnly: universalLinksOnly,
+    useSafariVC: useWebView,
+    useWebView: useWebView,
+    enableJavaScript: webConfiguration.enableJavaScript,
+    enableDomStorage: webConfiguration.enableDomStorage,
+    universalLinksOnly: mode == LaunchMode.externalNonBrowserApplication,
     headers: headers,
     webOnlyWindowName: webOnlyWindowName,
   );
-
-  if (statusBarBrightness != null && WidgetsBinding.instance != null) {
-    WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment =
-        previousAutomaticSystemUiAdjustment;
-  }
-
-  return result;
 }
 
+/// Deprecated String form of canLaunchUrl.
+@Deprecated('Use launchUrl')
 Future<bool> launch(
   String urlString, {
   bool? forceSafariVC,
@@ -163,17 +142,53 @@ Future<bool> launch(
     throw ArgumentError('Invalid URL: "$urlString"');
   }
 
-  return await launchUrl(
-    url,
-    forceSafariVC: forceSafariVC,
-    forceWebView: forceWebView,
-    enableJavaScript: enableJavaScript,
+  final WebConfiguration webConfig = WebConfiguration(
     enableDomStorage: enableDomStorage,
-    universalLinksOnly: universalLinksOnly,
+    enableJavaScript: enableJavaScript,
+  );
+  // Map the legacy arguments back to the resulting launch mode.
+  final bool isWebURL = url.scheme == 'http' || url.scheme == 'https';
+  LaunchMode mode = LaunchMode.platformDefault;
+  if (Platform.isIOS) {
+    if (forceSafariVC == false && universalLinksOnly) {
+      mode = LaunchMode.externalNonBrowserApplication;
+    } else {
+      mode = (forceSafariVC ?? isWebURL)
+          ? LaunchMode.inAppWebView
+          : LaunchMode.externalApplication;
+    }
+  } else if (Platform.isAndroid) {
+    mode =
+        forceWebView ? LaunchMode.inAppWebView : LaunchMode.externalApplication;
+  }
+
+  /// [true] so that ui is automatically computed if [statusBarBrightness] is set.
+  bool previousAutomaticSystemUiAdjustment = true;
+  if (statusBarBrightness != null &&
+      defaultTargetPlatform == TargetPlatform.iOS &&
+      WidgetsBinding.instance != null) {
+    previousAutomaticSystemUiAdjustment =
+        WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment;
+    WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment = false;
+    SystemChrome.setSystemUIOverlayStyle(statusBarBrightness == Brightness.light
+        ? SystemUiOverlayStyle.dark
+        : SystemUiOverlayStyle.light);
+  }
+
+  bool result = await launchUrl(
+    url,
+    mode: mode,
+    webConfiguration: webConfig,
     headers: headers,
-    statusBarBrightness: statusBarBrightness,
     webOnlyWindowName: webOnlyWindowName,
   );
+
+  if (statusBarBrightness != null && WidgetsBinding.instance != null) {
+    WidgetsBinding.instance!.renderView.automaticSystemUiAdjustment =
+        previousAutomaticSystemUiAdjustment;
+  }
+
+  return result;
 }
 
 /// Checks whether the specified URL can be handled by some app installed on the
